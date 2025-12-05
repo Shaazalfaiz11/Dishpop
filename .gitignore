@@ -1,0 +1,35 @@
+# Ignore all node_modules in entire project
+**/node_modules/
+
+# Environment Variables
+**/.env
+
+# Build Outputs (all environments)
+**/dist/
+**/build/
+**/dist-ssr/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local Files
+*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
