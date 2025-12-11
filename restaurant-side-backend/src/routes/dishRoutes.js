@@ -1,47 +1,71 @@
+// // routes/dish.routes.js
+// const express = require('express');
+// const router = express.Router();
+// const upload = require('../middlewares/upload.middleware');
+// const { isAuthenticated } = require("../middlewares/isAuthenticated");
+
+// const {
+//   toggleAvailability,
+//   updateStatus,
+//   getDish,
+//   getDishStats,
+//   updateDish
+// } = require('../controllers/dishController');
+
+// // GET single dish - PUBLIC
+// router.get("/dishes/:id", getDish);
+
+// // TOGGLE availability - PROTECTED
+// router.patch('/dishes/:id/availability', isAuthenticated, toggleAvailability);
+
+// // UPDATE dish - PROTECTED
+// router.put(
+//   '/restaurants/:restaurantId/dish/:id',
+//   isAuthenticated,
+//   upload.single('image'),
+//   updateDish
+// );
+
+// module.exports = router;
 // routes/dishRoutes.js
+
 const express = require("express");
 const router = express.Router();
+
 const upload = require("../middlewares/upload.middleware");
-const { isAuthenticated } = require("../middlewares/isAuthenticated");
+const isAuthenticated = require("../middlewares/isAuthenticated");
 
 const {
   getDish,
   updateDish,
-  toggleAvailability,
   deleteDish
 } = require("../controllers/dishController");
 
-// ==============================
-// GET single dish
-// GET /api/v1/dishes/:id
-// ==============================
-router.get("/dishes/:id", getDish);
+// =====================
+// GET SINGLE DISH (PUBLIC)
+// =====================
+router.get(
+  "/restaurants/:restaurantId/dishes/:dishId",
+  getDish
+);
 
-// ==============================
-// UPDATE dish
-// PUT /api/v1/restaurants/:restaurantId/dish/:id
-// ==============================
-router.put(
-  "/restaurants/:restaurantId/dish/:id",
+// =====================
+// UPDATE DISH (PROTECTED)
+// =====================
+router.patch(
+  "/restaurants/:restaurantId/dishes/:dishId",
   isAuthenticated,
   upload.single("image"),
   updateDish
 );
 
-// ==============================
-// TOGGLE availability
-// PATCH /api/v1/dishes/:id/availability
-// ==============================
-router.patch(
-  "/dishes/:id/availability",
+// =====================
+// DELETE DISH (PROTECTED)
+// =====================
+router.delete(
+  "/restaurants/:restaurantId/dishes/:dishId",
   isAuthenticated,
-  toggleAvailability
+  deleteDish
 );
-
-// ==============================
-// DELETE dish
-// DELETE /api/v1/dishes/:id
-// ==============================
-router.delete("/dishes/:id", isAuthenticated, deleteDish);
 
 module.exports = router;

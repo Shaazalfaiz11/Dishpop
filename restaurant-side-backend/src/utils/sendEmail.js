@@ -1,11 +1,11 @@
 const nodemailer = require("nodemailer");
 
-const sendEmail = async ({ email, subject, message }) => {
+const sendEmail = async ({ email, subject, message, html }) => {
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT),
-      secure: false, // true for 465, false for 587
+      secure: false,
       auth: {
         user: process.env.SMTP_MAIL,
         pass: process.env.SMTP_PASSWORD,
@@ -16,7 +16,8 @@ const sendEmail = async ({ email, subject, message }) => {
       from: `"DineAR App" <${process.env.SMTP_MAIL}>`,
       to: email,
       subject,
-      html: message,
+      html: html || message, // ❤️ NOW BOTH WORK
+      text: message || "",   // fallback text
     });
   } catch (err) {
     console.error("Error sending email:", err);

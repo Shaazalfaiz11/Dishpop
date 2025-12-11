@@ -17,11 +17,11 @@ const VerifyOTP = () => {
 
     setLoading(true);
     try {
-      const res = await axios.post(
-        "http://localhost:5001/api/auth/verify-otp",
-        { email, otp },
-        { withCredentials: true }
-      );
+     const res = await axios.post(
+  "http://localhost:5001/api/auth/verify-forgot-otp", // corrected endpoint
+  { email, otp },
+  { withCredentials: true }
+);
 
       toast.success(res.data.message || "OTP verified!");
       navigate("/reset-password", { state: { email, otp } });

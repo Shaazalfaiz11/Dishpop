@@ -1,13 +1,13 @@
 const Owner = require("../models/Owner.model");
 
 // ===============================
-// GET restaurant by ID (Public)
+// GET restaurant by username (Public)
 // ===============================
-exports.getRestaurantById = async (req, res) => {
+exports.getRestaurantByUsername = async (req, res) => {
   try {
-    const { restaurantId } = req.params;
+    const { username } = req.params;
 
-    const restaurant = await Owner.findOne({ restaurantId }).select(
+    const restaurant = await Owner.findOne({ username }).select(
       "-password -verificationCode -verificationCodeExpire -resetOTP -resetOTPExpire"
     );
 
@@ -23,20 +23,20 @@ exports.getRestaurantById = async (req, res) => {
       restaurant,
     });
   } catch (err) {
-    console.error("getRestaurantById ERROR:", err);
+    console.error("getRestaurantByUsername ERROR:", err);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
 
 // ==============================================
 // GET my restaurant (logged-in user)
-// Uses: req.user.restaurantId
+// Uses: req.user.username
 // ==============================================
 exports.getMyRestaurant = async (req, res) => {
   try {
-    const restaurantId = req.user.restaurantId;
+    const username = req.user.username;
 
-    const restaurant = await Owner.findOne({ restaurantId }).select(
+    const restaurant = await Owner.findOne({ username }).select(
       "-password -verificationCode -verificationCodeExpire -resetOTP -resetOTPExpire"
     );
 

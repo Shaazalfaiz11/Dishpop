@@ -1,14 +1,20 @@
 const express = require("express");
 const router = express.Router();
+
 const {
-  getRestaurantById,
+  getRestaurantByUsername,
   getMyRestaurant,
 } = require("../controllers/restaurant.controller.js");
 
-// For dashboard after login
+const isAuthenticated = require("../middlewares/isAuthenticated");
+
+// protect ALL restaurant routes
+router.use(isAuthenticated);
+
+// logged-in user restaurant
 router.get("/me", getMyRestaurant);
 
-// For direct access via restaurantId (frontend route)
-router.get("/:restaurantId", getRestaurantById);
+// public: access by username
+router.get("/:username", getRestaurantByUsername);
 
 module.exports = router;

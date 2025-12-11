@@ -1,10 +1,9 @@
 // src/hooks/useMenu.js
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import menuApi from "../api/menuApi";
 import { useParams } from "react-router-dom";
 
 export default function useMenu() {
-  // 🔥 FIX: useParams must be inside the hook
   const { restaurantId } = useParams();
   const RESTAURANT_ID = restaurantId;
 
@@ -26,10 +25,10 @@ export default function useMenu() {
   const [error, setError] = useState(null);
 
   /* ------------------------------------------------------------
-    1️⃣ Fetch menu (with retry + loading UI)
+    1️⃣ Fetch menu
   ------------------------------------------------------------ */
-  const fetchMenu = useCallback(async () => {
-    if (!RESTAURANT_ID) return; // Prevent undefined crash
+  const fetchMenu = async () => {
+    if (!RESTAURANT_ID) return;
 
     setLoading(true);
     setError(null);
@@ -60,14 +59,14 @@ export default function useMenu() {
       console.error("Menu fetch error:", e);
       setError("Failed to load menu");
       setLoading(false);
-
-      setTimeout(fetchMenu, 2000);
     }
-  }, [RESTAURANT_ID]);
+  };
 
+  // Fetch only once or when restaurantId changes
   useEffect(() => {
     fetchMenu();
-  }, [fetchMenu]);
+  }, [RESTAURANT_ID]);
+
 
   /* ------------------------------------------------------------
     2️⃣ Debounce search
@@ -80,6 +79,7 @@ export default function useMenu() {
     return () => clearTimeout(delay);
   }, [searchQuery]);
 
+
   /* ------------------------------------------------------------
     3️⃣ Filtering + Sorting
   ------------------------------------------------------------ */
@@ -88,24 +88,24 @@ export default function useMenu() {
 
     let list = [...dishes];
 
-    // Search
+    // search
     if (debouncedSearch) {
       const q = debouncedSearch.toLowerCase();
       list = list.filter((d) => d.name.toLowerCase().includes(q));
     }
 
-    // Category filter
+    // category
     if (selectedCategory !== "All Categories") {
       list = list.filter((d) => d.category === selectedCategory);
     }
 
-    // Availability filter
+    // availability
     if (selectedStatus !== "All Statuses") {
       const shouldBe = selectedStatus === "Available";
       list = list.filter((d) => d.available === shouldBe);
     }
 
-    // Sorting
+    // sort
     switch (sortBy) {
       case "price-asc":
         list.sort((a, b) => a.price - b.price);
@@ -122,6 +122,7 @@ export default function useMenu() {
 
     return list;
   }, [dishes, debouncedSearch, selectedCategory, selectedStatus, sortBy, loading]);
+
 
   /* ------------------------------------------------------------
     4️⃣ Toggle availability
@@ -157,6 +158,7 @@ export default function useMenu() {
     }
   };
 
+
   /* ------------------------------------------------------------
     5️⃣ Delete dish
   ------------------------------------------------------------ */
@@ -173,14 +175,18 @@ export default function useMenu() {
     }
   };
 
+
   /* ------------------------------------------------------------
-    6️⃣ Auto refresh on tab focus
+    6️⃣ Refresh menu when tab returns from background
   ------------------------------------------------------------ */
   useEffect(() => {
-    const onFocus = () => fetchMenu();
+    function onFocus() {
+      fetchMenu();
+    }
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [fetchMenu]);
+  }, [RESTAURANT_ID]); // ONLY restaurantId
+
 
   /* ------------------------------------------------------------
     7️⃣ Clear filters
