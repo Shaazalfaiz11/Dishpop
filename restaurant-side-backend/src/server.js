@@ -150,8 +150,20 @@
 // SERVER ENTRY POINT
 // ======================
 
+// LOAD ENV FIRST (IMPORTANT!)
+require("dotenv").config();
+
+// DEBUG ENVIRONMENT VARIABLES
+console.log("=== ENV DEBUG START ===");
+console.log("MONGO_URL:", process.env.MONGO_URL);
+console.log("R2_ACCESS_KEY:", process.env.R2_ACCESS_KEY);
+console.log("R2_SECRET_KEY:", process.env.R2_SECRET_KEY);
+console.log("R2_BUCKET:", process.env.R2_BUCKET);
+console.log("R2_ACCOUNT_ID:", process.env.R2_ACCOUNT_ID);
+console.log("R2_PUBLIC_URL:", process.env.R2_PUBLIC_URL);
+console.log("=== ENV DEBUG END ===");
+
 const express = require("express");
-const dotenv = require("dotenv");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
@@ -186,7 +198,7 @@ dotenv.config();
 const app = express();
 
 // ======================
-// CORS
+// CORS CONFIG
 // ======================
 app.use(
   cors({

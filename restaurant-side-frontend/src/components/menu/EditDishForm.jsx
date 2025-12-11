@@ -4,20 +4,6 @@ import useAutosave from "../../hooks/useAutoSave";
 import { compressImage } from "../../utils/CompressImage";
 import axiosClient from "../../api/AxiosClient"; // matches your naming
 
-/**
- * Props:
- * - mode: "add" | "edit"
- * - initial: object with initial values (for edit)
- * - restaurantId: string
- * - dishId: (optional) for edit only
- * - autosaveKey: string or null
- * - onSuccess: fn called after successful save (optional)
- * - submitUrl: full URL or relative endpoint to POST/PUT to (if you want custom)
- *
- * The component will call parent-provided submit handler if passed via props.onSubmit.
- * Otherwise it will send FormData automatically using submitUrl or standard endpoints.
- */
-
 export default function DishForm({
   mode = "add",
   initial = {},
@@ -49,7 +35,6 @@ export default function DishForm({
   const [progress, setProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
-  // load autosave draft if present (and merge)
   useEffect(() => {
     if (!autosaveKey) return;
     try {
@@ -58,15 +43,11 @@ export default function DishForm({
         const draft = JSON.parse(raw);
         setForm((s) => ({ ...s, ...draft }));
       }
-    } catch (err) {
-      // ignore
-    }
+    } catch {}
   }, [autosaveKey]);
 
-  // Autosave hook
   useAutosave(autosaveKey, form, { debounceMs: 800 });
 
-  // auto-slug when name changes
   useEffect(() => {
     const id = setTimeout(() => {
       setForm((s) => ({ ...s, slug: makeSlug(s.name) }));
@@ -74,42 +55,32 @@ export default function DishForm({
     return () => clearTimeout(id);
   }, [form.name]);
 
-  // load categories: first try dedicated API, fallback to menu listing
- 
-useEffect(() => {
-  let cancelled = false;
+  useEffect(() => {
+    let cancelled = false;
 
-  (async () => {
-    try {
-      // ✔ Correct route (your backend)
-      const res = await axiosClient.get(`/restaurants/${restaurantId}/categories`);
-      const data = res.data?.data ?? res.data;
+    (async () => {
+      try {
+        const res = await axiosClient.get(`/restaurants/${restaurantId}/categories`);
+        const data = res.data?.data ?? res.data;
 
-      if (!cancelled && Array.isArray(data)) {
-        setCategories(data);
-      }
-      return; // success
-    } catch (err) {
-      console.warn("Category API failed, retry via menu...", err);
-    }
+        if (!cancelled && Array.isArray(data)) setCategories(data);
+        return;
+      } catch {}
 
-    // fallback to menu
-    try {
-      const res2 = await axiosClient.get(`/restaurants/${restaurantId}/menu`);
-      const dishes = res2.data?.data?.dishes ?? [];
-      const unique = [...new Set(dishes.map((d) => d.category || "Uncategorized"))];
+      try {
+        const res2 = await axiosClient.get(`/restaurants/${restaurantId}/menu`);
+        const dishes = res2.data?.data?.dishes ?? [];
+        const unique = [...new Set(dishes.map((d) => d.category || "Uncategorized"))];
 
-      if (!cancelled) setCategories(unique);
-    } catch (err) {
-      console.warn("Fallback category load failed", err);
-    }
-  })();
+        if (!cancelled) setCategories(unique);
+      } catch {}
+    })();
 
-  return () => { cancelled = true };
-}, [restaurantId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [restaurantId]);
 
-
-  // preview cleanup
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -134,10 +105,11 @@ useEffect(() => {
   function validate() {
     const e = {};
     if (!form.name || form.name.trim().length < 2) e.name = "Name must be at least 2 characters.";
-    if (!form.price || Number.isNaN(Number(form.price)) || Number(form.price) <= 0) e.price = "Enter valid price.";
+    if (!form.price || Number.isNaN(Number(form.price)) || Number(form.price) <= 0)
+      e.price = "Enter valid price.";
     if (imageFile) {
       if (!imageFile.type.startsWith("image/")) e.image = "Only images allowed.";
-      if (imageFile.size > 10 * 1024 * 1024) e.image = "Image must be smaller than 10MB (will compress).";
+      if (imageFile.size > 10 * 1024 * 1024) e.image = "Image must be smaller than 10MB.";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -150,15 +122,18 @@ useEffect(() => {
       setErrors((p) => ({ ...p, image: "Only images allowed" }));
       return;
     }
-    // If large, compress (we allow bigger then compress)
+
     setErrors((p) => ({ ...p, image: undefined }));
     try {
-      const compressed = await compressImage(f, { maxWidth: 1600, maxHeight: 1600, quality: 0.78 });
+      const compressed = await compressImage(f, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.78,
+      });
       setImageFile(compressed);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(compressed));
-    } catch (err) {
-      console.warn("compress error", err);
+    } catch {
       setImageFile(f);
       setPreviewUrl(URL.createObjectURL(f));
     }
@@ -176,7 +151,7 @@ useEffect(() => {
     if (fileRef.current) fileRef.current.click();
   }
 
-  // Generic submit that parents can override; returns server response
+  // 🔥 UPDATED SUBMIT FUNCTION (only URL change for edit mode)
   async function submit(e) {
     if (e && e.preventDefault) e.preventDefault();
     if (!validate()) return;
@@ -186,7 +161,6 @@ useEffect(() => {
     setToast({ type: "info", message: mode === "add" ? "Creating..." : "Updating..." });
 
     try {
-      // Build FormData
       const fd = new FormData();
       fd.append("name", form.name);
       fd.append("slug", form.slug);
@@ -198,18 +172,20 @@ useEffect(() => {
 
       if (imageFile) fd.append("image", imageFile);
 
-      // If parent passed a custom submitUrl, use it; else use defaults
       let method = "post";
       let url = submitUrl;
+
       if (!url) {
         if (mode === "add") {
-          url = `/restaurants/${restaurantId}/menu`;
-          method = "post";
-        } else {
-          // edit mode -> per your router: PUT /restaurants/:restaurantId/dish/:id
-          url = `/restaurants/${restaurantId}/dish/${dishId}`;
-          method = "put";
-        }
+  // correct endpoint for creating a dish
+  url = `/restaurants/${restaurantId}/menu`;
+  method = "post";
+}   else {
+  // correct endpoint for editing a dish
+   url = `/restaurants/${restaurantId}/dish/${dishId}`;
+   method = "put";
+}
+
       }
 
       const res = await axiosClient({
@@ -224,9 +200,13 @@ useEffect(() => {
         timeout: 120000,
       });
 
-      // success -> clear autosave key
       if (autosaveKey) localStorage.removeItem(autosaveKey);
-      setToast({ type: "success", message: mode === "add" ? "Dish created" : "Dish updated" });
+
+      setToast({
+        type: "success",
+        message: mode === "add" ? "Dish created" : "Dish updated",
+      });
+
       return res.data;
     } catch (err) {
       console.error("submit error", err);
@@ -257,12 +237,11 @@ useEffect(() => {
       )}
 
       <form onSubmit={submit}>
-        {/* Basic Dish Details */}
+        {/* BASIC DETAILS */}
         <div className="p-6 border-b border-zinc-800">
           <h2 className="text-lg font-semibold text-white mb-4">Basic Dish Details</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Name */}
             <div>
               <label className="block text-sm text-zinc-400 mb-2">Dish Name</label>
               <input
@@ -275,7 +254,6 @@ useEffect(() => {
               {errors.name && <p className="text-xs text-red-400 mt-1">{errors.name}</p>}
             </div>
 
-            {/* Price */}
             <div>
               <label className="block text-sm text-zinc-400 mb-2">Price (₹)</label>
               <input
@@ -288,7 +266,6 @@ useEffect(() => {
               {errors.price && <p className="text-xs text-red-400 mt-1">{errors.price}</p>}
             </div>
 
-            {/* Category */}
             <div>
               <label className="block text-sm text-zinc-400 mb-2">Category</label>
               <select
@@ -305,8 +282,6 @@ useEffect(() => {
                 ))}
               </select>
             </div>
-
-            {/* New category handled by parent UI if needed */}
           </div>
 
           <div className="mt-4">
@@ -321,21 +296,40 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Image */}
+        {/* IMAGE */}
         <div className="p-6 border-b border-zinc-800">
           <h2 className="text-lg font-semibold text-white mb-4">Dish Image</h2>
 
           <div>
             {!previewUrl && !existingImage ? (
-              <div onClick={triggerFileInput} className="border-2 border-dashed border-zinc-800 rounded-lg p-8 text-center cursor-pointer hover:border-zinc-700">
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect(e.target.files)} />
+              <div
+                onClick={triggerFileInput}
+                className="border-2 border-dashed border-zinc-800 rounded-lg p-8 text-center cursor-pointer hover:border-zinc-700"
+              >
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleFileSelect(e.target.files)}
+                />
                 <p className="text-white text-sm mb-1">Drag & drop or click to upload</p>
-                <p className="text-zinc-500 text-xs">Max size: 5MB (compressed if needed)</p>
+                <p className="text-zinc-500 text-xs">Max size: 5MB</p>
               </div>
             ) : (
               <div className="relative inline-block">
-                <img src={previewUrl || existingImage} alt="dish" className="w-full max-w-sm h-48 object-cover rounded-lg border border-zinc-800" />
-                <button type="button" onClick={removeImage} className="absolute top-2 right-2 bg-black/70 text-white p-1.5 rounded-full">✕</button>
+                <img
+                  src={previewUrl || existingImage}
+                  alt="dish"
+                  className="w-full max-w-sm h-48 object-cover rounded-lg border border-zinc-800"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 bg-black/70 text-white p-1.5 rounded-full"
+                >
+                  ✕
+                </button>
                 {submitting && (
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-800">
                     <div className="h-full bg-blue-600" style={{ width: `${progress}%` }} />
@@ -348,40 +342,66 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Toggles */}
+        {/* TOGGLES */}
         <div className="p-6 border-b border-zinc-800">
           <div className="flex items-center gap-8">
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" name="available" checked={form.available} onChange={onChange} className="sr-only" />
-              <div className={`relative w-11 h-6 rounded-full transition-colors ${form.available ? "bg-blue-600" : "bg-zinc-700"}`}>
-                <div className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full transition-transform ${form.available ? "translate-x-5" : ""}`} />
+              <div
+                className={`relative w-11 h-6 rounded-full transition-colors ${
+                  form.available ? "bg-blue-600" : "bg-zinc-700"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full transition-transform ${
+                    form.available ? "translate-x-5" : ""
+                  }`}
+                />
               </div>
               <span className="text-sm text-zinc-300">Available</span>
             </label>
 
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" name="isVeg" checked={form.isVeg} onChange={onChange} className="sr-only" />
-              <div className={`relative w-11 h-6 rounded-full transition-colors ${form.isVeg ? "bg-green-600" : "bg-zinc-700"}`}>
-                <div className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full transition-transform ${form.isVeg ? "translate-x-5" : ""}`} />
+              <div
+                className={`relative w-11 h-6 rounded-full transition-colors ${
+                  form.isVeg ? "bg-green-600" : "bg-zinc-700"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full transition-transform ${
+                    form.isVeg ? "translate-x-5" : ""
+                  }`}
+                />
               </div>
               <span className="text-sm text-zinc-300">Vegetarian</span>
             </label>
           </div>
         </div>
 
-        {/* Submit */}
+        {/* SUBMIT BUTTON */}
         <div className="p-6">
-          <button type="submit" disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+          >
             {submitting ? (
               <>
                 <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
                 {mode === "add" ? "Saving..." : "Updating..."}
               </>
+            ) : mode === "add" ? (
+              "Save Dish"
             ) : (
-              mode === "add" ? "Save Dish" : "Save Changes"
+              "Save Changes"
             )}
           </button>
         </div>
@@ -392,7 +412,6 @@ useEffect(() => {
   );
 }
 
-// small helpers used within the file
 function makeSlug(text = "") {
   return text
     .toString()
