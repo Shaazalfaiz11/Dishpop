@@ -49,7 +49,7 @@ const DishList = () => {
 
 
   const handleEdit = (dish) => {
-  navigate(`/restaurants/${restaurantId}/dish/${dish._id}/edit`);
+  navigate(`/restaurant/${restaurantId}/dish/${dish._id}/edit`);
 };
 
 
