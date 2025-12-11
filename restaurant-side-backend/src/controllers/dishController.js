@@ -3,10 +3,82 @@ const Category = require('../models/Category');
 const ApiResponse = require('../utils/apiResponse');
 const logger = require('../utils/logger');
 
+const path = require("path");
+const sharp = require("sharp");
+const { v4: uuidv4 } = require("uuid");
+
+// NEW — Cloudflare R2 storage helper
+const { uploadBuffer } = require("../helpers/storageR2");
+const R2_BUCKET = process.env.R2_BUCKET;
+
+
+// ========================================================
+// @desc    Update dish (R2 Version)
+// @route   PUT /api/v1/restaurants/:restaurantId/dish/:id
+// ========================================================
+exports.updateDish = async (req, res, next) => {
+  try {
+    const { restaurantId, id } = req.params;
+
+    const dish = await Dish.findOne({ _id: id, restaurantId });
+    if (!dish) return ApiResponse.notFound(res, "Dish not found");
+
+    let imageUrl = dish.imageUrl;
+    let thumbnailUrl = dish.thumbnailUrl;
+
+    // If image was uploaded — replace old with new
+    if (req.file) {
+      const ext = path.extname(req.file.originalname) || ".jpg";
+      const baseKey = `restaurants/${restaurantId}/dishes/${uuidv4()}`;
+
+      // Upload original to Cloudflare R2
+      imageUrl = await uploadBuffer(
+        req.file.buffer,
+        R2_BUCKET,
+        `${baseKey}${ext}`,
+        req.file.mimetype
+      );
+
+      // Upload thumbnail
+      const resized = await sharp(req.file.buffer)
+        .resize(800, 800)
+        .jpeg({ quality: 80 })
+        .toBuffer();
+
+      thumbnailUrl = await uploadBuffer(
+        resized,
+        R2_BUCKET,
+        `${baseKey}-thumb.jpg`,
+        "image/jpeg"
+      );
+    }
+
+    // Update fields
+    dish.name = req.body.name ?? dish.name;
+    dish.slug = req.body.slug ?? dish.slug;
+    dish.description = req.body.description ?? dish.description;
+    dish.price = req.body.price ?? dish.price;
+    dish.category = req.body.category ?? dish.category;
+    dish.available = req.body.available ?? dish.available;
+    dish.isVeg = req.body.isVeg ?? dish.isVeg;
+
+    dish.imageUrl = imageUrl;
+    dish.thumbnailUrl = thumbnailUrl;
+    dish.updatedAt = Date.now();
+
+    await dish.save();
+
+    return ApiResponse.success(res, dish, "Dish updated successfully");
+  } catch (err) {
+    logger.error("Update dish error:", err);
+    next(err);
+  }
+};
+
+
 // ========================================================
 // @desc    Get all dishes
 // @route   GET /api/v1/dishes
-// @access  Public
 // ========================================================
 exports.getAllDishes = async (req, res, next) => {
   try {
@@ -62,16 +134,15 @@ exports.getAllDishes = async (req, res, next) => {
   }
 };
 
+
 // ========================================================
 // @desc    Get a single dish
 // @route   GET /api/v1/dishes/:id
-// @access  Public
 // ========================================================
 exports.getDish = async (req, res, next) => {
   try {
     const dish = await Dish.findById(req.params.id)
       .populate('category', 'name description icon');
-      
 
     if (!dish) return ApiResponse.notFound(res, 'Dish not found');
 
@@ -82,10 +153,10 @@ exports.getDish = async (req, res, next) => {
   }
 };
 
+
 // ========================================================
-// @desc    Create new dish
+// @desc    Create new dish (no S3 here)
 // @route   POST /api/v1/dishes
-// @access  Private (Admin/Manager)
 // ========================================================
 exports.createDish = async (req, res, next) => {
   try {
@@ -113,71 +184,10 @@ exports.createDish = async (req, res, next) => {
   }
 };
 
-// ========================================================
-// @desc    Update dish
-// @route   PUT /api/v1/dishes/:id
-// @access  Private (Admin/Manager)
-// ========================================================
-exports.updateDish = async (req, res, next) => {
-  try {
-    const { restaurantId, id } = req.params;
-
-    let dish = await Dish.findOne({ _id: id, restaurantId });
-    if (!dish) return ApiResponse.notFound(res, 'Dish not found');
-
-    let imageUrl = dish.imageUrl;
-    let thumbnailUrl = dish.thumbnailUrl;
-
-    // NEW IMAGE UPLOAD
-    if (req.file) {
-      const ext = path.extname(req.file.originalname) || '.jpg';
-      const baseKey = `restaurants/${restaurantId}/dishes/${uuidv4()}`;
-
-      // Upload original
-      imageUrl = await uploadBufferToS3(
-        req.file.buffer,
-        S3_BUCKET,
-        `${baseKey}${ext}`,
-        req.file.mimetype
-      );
-
-      // Upload thumbnail
-      const resized = await sharp(req.file.buffer)
-        .resize(800, 800)
-        .jpeg({ quality: 80 })
-        .toBuffer();
-
-      thumbnailUrl = await uploadBufferToS3(
-        resized,
-        S3_BUCKET,
-        `${baseKey}-thumb.jpg`,
-        'image/jpeg'
-      );
-    }
-
-    dish = await Dish.findByIdAndUpdate(
-      id,
-      {
-        ...req.body,
-        imageUrl,
-        thumbnailUrl,
-        updatedAt: Date.now(),
-      },
-      { new: true }
-    );
-
-    return ApiResponse.success(res, dish, 'Dish updated successfully');
-  } catch (err) {
-    logger.error('Update dish error:', err);
-    next(err);
-  }
-};
-
 
 // ========================================================
 // @desc    Delete dish
 // @route   DELETE /api/v1/dishes/:id
-// @access  Private (Admin)
 // ========================================================
 exports.deleteDish = async (req, res, next) => {
   try {
@@ -199,10 +209,9 @@ exports.deleteDish = async (req, res, next) => {
   }
 };
 
+
 // ========================================================
 // @desc    Toggle availability
-// @route   PATCH /api/v1/dishes/:id/availability
-// @access  Private (Admin/Manager)
 // ========================================================
 exports.toggleAvailability = async (req, res, next) => {
   try {
@@ -210,10 +219,6 @@ exports.toggleAvailability = async (req, res, next) => {
     if (!dish) return ApiResponse.notFound(res, 'Dish not found');
 
     dish.available = !dish.available;
-
-    // Remove user-ID tracking until auth is ready
-    // dish.updatedBy = req.user._id;
-
     await dish.save();
 
     return ApiResponse.success(
@@ -229,8 +234,6 @@ exports.toggleAvailability = async (req, res, next) => {
 
 // ========================================================
 // @desc    Update status
-// @route   PATCH /api/v1/dishes/:id/status
-// @access  Private (Admin/Manager)
 // ========================================================
 exports.updateStatus = async (req, res, next) => {
   try {
@@ -251,10 +254,9 @@ exports.updateStatus = async (req, res, next) => {
   }
 };
 
+
 // ========================================================
-// @desc    Dish statistics (Includes category-wise stats)
-// @route   GET /api/v1/dishes/stats
-// @access  Private (Admin/Manager)
+// @desc    Dish statistics
 // ========================================================
 exports.getDishStats = async (req, res, next) => {
   try {
@@ -262,7 +264,6 @@ exports.getDishStats = async (req, res, next) => {
       {
         $group: {
           _id: null,
-                   
           total: { $sum: 1 },
           available: { $sum: { $cond: ['$available', 1, 0] } },
           unavailable: { $sum: { $cond: [{ $not: ['$available'] }, 1, 0] } },

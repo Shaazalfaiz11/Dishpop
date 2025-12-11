@@ -14,37 +14,27 @@ export default function EditDishPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
+  let cancelled = false;
 
-    (async () => {
-      setLoading(true);
+  (async () => {
+    setLoading(true);
 
-      // 1️⃣ Try menu route (if you created GET /menu/:id)
-      try {
-        const res = await axiosClient.get(
-          `/restaurants/${RESTAURANT_ID}/menu/${id}`
-        );
+    try {
+      // correct backend route: GET /api/v1/dishes/:id
+      const res = await axiosClient.get(`/dishes/${id}`);
 
-        const data = res.data?.data ?? res.data;
-        if (!cancelled) setInitial(data);
-        setLoading(false);
-        return;
-      } catch {}
+      const data = res.data?.data ?? res.data;
+      if (!cancelled) setInitial(data);
+    } catch (err) {
+      console.error("Failed to load dish", err);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  })();
 
-      // 2️⃣ Fallback to dish route
-      try {
-        const res2 = await axiosClient.get(`/dishes/${id}`);
-        const data = res2.data?.data ?? res2.data;
-        if (!cancelled) setInitial(data);
-      } catch (err) {
-        console.error("Failed to load dish", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+  return () => (cancelled = true);
+}, [id]);
 
-    return () => (cancelled = true);
-  }, [RESTAURANT_ID, id]);
 
   if (loading) return <div className="p-6 text-white">Loading dish...</div>;
   if (!initial) return <div className="p-6 text-white">Dish not found</div>;

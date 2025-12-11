@@ -24,10 +24,9 @@ router.get('/restaurants/:restaurantId/categories', async (req, res) => {
   }
 });
 
-// GET full menu - PUBLIC
+
 router.get('/restaurants/:restaurantId/menu', getMenu);
 
-// GET single dish from menu - PUBLIC
 router.get("/restaurants/:restaurantId/menu/:id", getDish);
 
 // CREATE dish - PROTECTED
@@ -44,5 +43,26 @@ router.delete(
   isAuthenticated,
   deleteDish
 );
+
+
+
+//// admin
+router.get("/dishes/by-email/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+
+    const owner = await Owner.findOne({ email });
+
+    if (!owner) return res.status(404).json({ success: false, message: "Restaurant not found" });
+
+    const dishes = await Dish.find({ restaurantEmail: email });
+
+    return res.json({ success: true, dishes });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 
 module.exports = router;

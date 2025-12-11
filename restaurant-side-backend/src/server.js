@@ -2,8 +2,20 @@
 // SERVER ENTRY POINT
 // ======================
 
+// LOAD ENV FIRST (IMPORTANT!)
+require("dotenv").config();
+
+// DEBUG ENVIRONMENT VARIABLES
+console.log("=== ENV DEBUG START ===");
+console.log("MONGO_URL:", process.env.MONGO_URL);
+console.log("R2_ACCESS_KEY:", process.env.R2_ACCESS_KEY);
+console.log("R2_SECRET_KEY:", process.env.R2_SECRET_KEY);
+console.log("R2_BUCKET:", process.env.R2_BUCKET);
+console.log("R2_ACCOUNT_ID:", process.env.R2_ACCOUNT_ID);
+console.log("R2_PUBLIC_URL:", process.env.R2_PUBLIC_URL);
+console.log("=== ENV DEBUG END ===");
+
 const express = require("express");
-const dotenv = require("dotenv");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
@@ -22,12 +34,10 @@ const orderRoutes = require("./routes/orderRoutes.js");
 // Socket handler
 const socketHandler = require("./config/socket.js");
 
-dotenv.config();
-
 const app = express();
 
 // ======================
-// CORS
+// CORS CONFIG
 // ======================
 app.use(
   cors({
@@ -38,7 +48,7 @@ app.use(
 );
 
 // ======================
-// Middlewares
+// BODY PARSER
 // ======================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -51,7 +61,7 @@ app.use((req, res, next) => {
 });
 
 // ======================
-// MongoDB Connection
+// MONGODB CONNECTION
 // ======================
 mongoose
   .connect(process.env.MONGO_URL)
@@ -77,23 +87,26 @@ socketHandler(io);
 // ROUTES
 // ======================
 
-// 🔓 Public Routes
+// PUBLIC ROUTES
 app.use("/api/auth", authRoutes);
 
-// 🔐 Protected Routes
-app.use("/api/v1/menu", isAuthenticated, menuRoutes);
-app.use("/api/v1/dish", isAuthenticated, dishRoutes);
+// RESTAURANT AUTH REQUIRED ROUTES
+app.use("/api/v1", isAuthenticated, menuRoutes);
+app.use("/api/v1", isAuthenticated, dishRoutes);
 app.use("/api/v1/order", isAuthenticated, orderRoutes);
+
+// RESTAURANT MANAGEMENT ROUTES (ADMIN PANEL)
 app.use("/api/restaurant", require("./routes/restaurant.routes.js"));
 
-
-// Healthcheck
+// ======================
+// HEALTHCHECK
+// ======================
 app.get("/", (req, res) => {
   res.json({ success: true, message: "Backend running" });
 });
 
 // ======================
-// 404 Handler (Must be last route)
+// 404 HANDLER
 // ======================
 app.use("*", (req, res) => {
   res.status(404).json({
