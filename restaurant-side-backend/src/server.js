@@ -1,3 +1,151 @@
+// // ======================
+// // SERVER ENTRY POINT
+// // ======================
+
+// const express = require("express");
+// const dotenv = require("dotenv");
+// const cors = require("cors");
+// const mongoose = require("mongoose");
+// const cookieParser = require("cookie-parser");
+// const http = require("http");
+// const { Server } = require("socket.io");
+
+// // ======================
+// // ROUTES
+// // ======================
+// const authRoutes = require("./routes/auth.routes.js");
+// const menuRoutes = require("./routes/menuRoutes.js");
+// const dishRoutes = require("./routes/dishRoutes.js");
+// const orderRoutes = require("./routes/orderRoutes.js");
+// const restaurantRoutes = require("./routes/restaurant.routes.js");
+// const userRoutes = require("./routes/user.routes.js");
+
+
+// // ======================
+// // MIDDLEWARES
+// // ======================
+// const isAuthenticated = require("./middlewares/isAuthenticated.js");
+// const errorMiddleware = require("./middlewares/error.js");
+
+// // ======================
+// // SOCKET HANDLER
+// // ======================
+// const socketHandler = require("./config/socket.js");
+
+// // ======================
+// // ENV CONFIG
+// // ======================
+// dotenv.config();
+
+// const app = express();
+
+// // ======================
+// // CORS
+// // ======================
+// app.use(
+//   cors({
+//     origin: ["http://localhost:5173", "http://localhost:5174"],
+//     credentials: true,
+//     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+//   })
+// );
+
+// // ======================
+// // GLOBAL MIDDLEWARES
+// // ======================
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
+// app.use(cookieParser());
+
+// // Debug logger
+// app.use((req, res, next) => {
+//   console.log(`[${req.method}] ${req.url}`);
+//   next();
+// });
+
+// // ======================
+// // MONGODB CONNECTION
+// // ======================
+// mongoose
+//   .connect(process.env.MONGO_URL)
+//   .then(() => console.log("MongoDB Connected"))
+//   .catch((err) => console.error("Mongo Connection Error:", err));
+
+// // ======================
+// // SOCKET.IO SETUP
+// // ======================
+// const server = http.createServer(app);
+
+// const io = new Server(server, {
+//   cors: {
+//     origin: ["http://localhost:5173", "http://localhost:5174"],
+//     credentials: true,
+//   },
+// });
+
+// app.set("io", io);
+// socketHandler(io);
+
+// // ======================
+// // SAFE ROUTER WRAPPER
+// // ======================
+// // Allows app.use(path, isAuthenticated, router)
+// // without changing structure
+// const useProtected = (path, middleware, router) => {
+//   app.use(path, middleware, (req, res, next) => router(req, res, next));
+// };
+
+// // ======================
+// // ROUTES
+// // ======================
+
+// // Public routes (no auth required)
+// app.use("/api/auth", authRoutes);
+
+// // Protected routes (auth required)  -- keeping your structure
+// useProtected("/api/v1/menu", isAuthenticated, menuRoutes);
+// useProtected("/api/v1/dish", isAuthenticated, dishRoutes);
+// useProtected("/api/v1/order", isAuthenticated, orderRoutes);
+
+// // Restaurant routes (auth inside router)
+// app.use("/api/v1/restaurant", restaurantRoutes);
+// app.use("/api/users", userRoutes);
+
+
+// // ======================
+// // HEALTH CHECK
+// // ======================
+// app.get("/", (req, res) => {
+//   res.json({ success: true, message: "Backend running successfully!" });
+// });
+
+// // ======================
+// // 404 HANDLER
+// // ======================
+// app.use("*", (req, res) => {
+//   res.status(404).json({
+//     success: false,
+//     message: "Route not found",
+//   });
+// });
+
+// // ======================
+// // GLOBAL ERROR HANDLER
+// // ======================
+ 
+// console.log("DEBUG >> errorMiddleware = ", errorMiddleware);
+// app.use(errorMiddleware);
+
+
+// // ======================
+// // START SERVER
+// // ======================
+// const PORT = process.env.PORT || 5001;
+// server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// ======================
+// SERVER ENTRY POINT
+// ======================
+
 // ======================
 // SERVER ENTRY POINT
 // ======================
@@ -10,20 +158,31 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const { Server } = require("socket.io");
 
-// Middlewares
-const { isAuthenticated } = require("./middlewares/isAuthenticated.js");
-
-// Routes
-const authRoutes = require("./routes/auth.Routes.js");
+// ======================
+// ROUTES
+// ======================
+const authRoutes = require("./routes/auth.routes.js");
 const menuRoutes = require("./routes/menuRoutes.js");
 const dishRoutes = require("./routes/dishRoutes.js");
 const orderRoutes = require("./routes/orderRoutes.js");
+const restaurantRoutes = require("./routes/restaurant.routes.js");
+// const userRoutes = require("./routes/user.routes.js");
 
-// Socket handler
+// ======================
+// MIDDLEWARES
+// ======================
+const isAuthenticated = require("./middlewares/isAuthenticated.js");
+const errorMiddleware = require("./middlewares/error.js");
+
+// ======================
+// SOCKET HANDLER
+// ======================
 const socketHandler = require("./config/socket.js");
 
+// ======================
+// ENV CONFIG
+// ======================
 dotenv.config();
-
 const app = express();
 
 // ======================
@@ -38,20 +197,20 @@ app.use(
 );
 
 // ======================
-// Middlewares
+// GLOBAL MIDDLEWARES
 // ======================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Debug Logger
+// Debug logger
 app.use((req, res, next) => {
   console.log(`[${req.method}] ${req.url}`);
   next();
 });
 
 // ======================
-// MongoDB Connection
+// MONGODB CONNECTION
 // ======================
 mongoose
   .connect(process.env.MONGO_URL)
@@ -59,7 +218,7 @@ mongoose
   .catch((err) => console.error("Mongo Connection Error:", err));
 
 // ======================
-// SOCKET.IO
+// SOCKET.IO SETUP
 // ======================
 const server = http.createServer(app);
 
@@ -77,23 +236,32 @@ socketHandler(io);
 // ROUTES
 // ======================
 
-// 🔓 Public Routes
+// PUBLIC ROUTES
 app.use("/api/auth", authRoutes);
 
-// 🔐 Protected Routes
+// PROTECTED ROUTES (correct Express syntax)
 app.use("/api/v1/menu", isAuthenticated, menuRoutes);
 app.use("/api/v1/dish", isAuthenticated, dishRoutes);
 app.use("/api/v1/order", isAuthenticated, orderRoutes);
-app.use("/api/restaurant", require("./routes/restaurant.routes.js"));
 
+// RESTAURANT ROUTES
+app.use("/api/v1/restaurant", restaurantRoutes);
 
-// Healthcheck
+// USER ROUTES
+// app.use("/api/users", userRoutes);
+
+// ======================
+// HEALTH CHECK
+// ======================
 app.get("/", (req, res) => {
-  res.json({ success: true, message: "Backend running" });
+  res.json({
+    success: true,
+    message: "Backend running successfully!",
+  });
 });
 
 // ======================
-// 404 Handler (Must be last route)
+// 404 HANDLER
 // ======================
 app.use("*", (req, res) => {
   res.status(404).json({
@@ -105,16 +273,10 @@ app.use("*", (req, res) => {
 // ======================
 // GLOBAL ERROR HANDLER
 // ======================
-app.use((err, req, res, next) => {
-  console.error("🔥 ERROR:", err);
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || "Internal Server Error",
-  });
-});
+app.use(errorMiddleware);
 
 // ======================
 // START SERVER
 // ======================
 const PORT = process.env.PORT || 5001;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
